@@ -214,39 +214,41 @@ class NfvoPlugin(nfvo_db.NfvoPluginDb, vnffg_db.VnffgPluginDbMixin):
     @log.log
     def create_vnffg(self, context, vnffg):
         vnffg_dict = super(NfvoPlugin, self)._create_vnffg_pre(context, vnffg)
-        nfp = super(NfvoPlugin, self).get_nfp(context,
-                                              vnffg_dict['forwarding_paths'])
-        sfc = super(NfvoPlugin, self).get_sfc(context, nfp['chain_id'])
-        match = super(NfvoPlugin, self).get_classifier(context,
-                                                       nfp['classifier_id'],
-                                                       fields='match')['match']
+    # Deepak
+        LOG.debug(_('Deepak vnffg_dict : %s'), vnffg_dict)
+    #    nfp = super(NfvoPlugin, self).get_nfp(context,
+    #                                          vnffg_dict['forwarding_paths'])
+    #    sfc = super(NfvoPlugin, self).get_sfc(context, nfp['chain_id'])
+    #    match = super(NfvoPlugin, self).get_classifier(context,
+    #                                                   nfp['classifier_id'],
+    #                                                   fields='match')['match']
         # grab the first VNF to check it's VIM type
         # we have already checked that all VNFs are in the same VIM
-        vim_obj = self._get_vim_from_vnf(context,
-                                         list(vnffg_dict[
-                                              'vnf_mapping'].values())[0])
+    #    vim_obj = self._get_vim_from_vnf(context,
+    #                                     list(vnffg_dict[
+    #                                          'vnf_mapping'].values())[0])
         # TODO(trozet): figure out what auth info we actually need to pass
         # to the driver.  Is it a session, or is full vim obj good enough?
-        driver_type = vim_obj['type']
-        try:
-            fc_id = self._vim_drivers.invoke(driver_type,
-                                             'create_flow_classifier',
-                                             name=vnffg_dict['name'],
-                                             fc=match,
-                                             auth_attr=vim_obj['auth_cred'],
-                                             symmetrical=sfc['symmetrical'])
-            sfc_id = self._vim_drivers.invoke(driver_type,
-                                              'create_chain',
-                                              name=vnffg_dict['name'],
-                                              vnfs=sfc['chain'], fc_id=fc_id,
-                                              symmetrical=sfc['symmetrical'],
-                                              auth_attr=vim_obj['auth_cred'])
-        except Exception:
-            with excutils.save_and_reraise_exception():
-                self.delete_vnffg(context, vnffg_id=vnffg_dict['id'])
-        super(NfvoPlugin, self)._create_vnffg_post(context, sfc_id, fc_id,
-                                                   vnffg_dict)
-        super(NfvoPlugin, self)._create_vnffg_status(context, vnffg_dict)
+    #    driver_type = vim_obj['type']
+    #    try:
+    #        fc_id = self._vim_drivers.invoke(driver_type,
+    #                                         'create_flow_classifier',
+    #                                         name=vnffg_dict['name'],
+    #                                         fc=match,
+    #                                         auth_attr=vim_obj['auth_cred'],
+    #                                         symmetrical=sfc['symmetrical'])
+    #        sfc_id = self._vim_drivers.invoke(driver_type,
+    #                                          'create_chain',
+    #                                          name=vnffg_dict['name'],
+    #                                          vnfs=sfc['chain'], fc_id=fc_id,
+    #                                          symmetrical=sfc['symmetrical'],
+    #                                          auth_attr=vim_obj['auth_cred'])
+    #    except Exception:
+    #        with excutils.save_and_reraise_exception():
+    #            self.delete_vnffg(context, vnffg_id=vnffg_dict['id'])
+    #    super(NfvoPlugin, self)._create_vnffg_post(context, sfc_id, fc_id,
+    #                                               vnffg_dict)
+    #    super(NfvoPlugin, self)._create_vnffg_status(context, vnffg_dict)
         return vnffg_dict
 
     @log.log

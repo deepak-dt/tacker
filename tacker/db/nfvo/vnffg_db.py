@@ -29,7 +29,11 @@ from tacker.extensions import nfvo
 from tacker.extensions.nfvo_plugins import vnffg
 from tacker import manager
 from tacker.plugins.common import constants
-
+import re
+from xml.etree.ElementTree import Element, SubElement ,tostring
+from xml.etree import ElementTree
+from xml.dom import minidom
+import requests
 
 LOG = logging.getLogger(__name__)
 _ACTIVE_UPDATE = (constants.ACTIVE, constants.PENDING_UPDATE)
@@ -292,72 +296,127 @@ class VnffgPluginDbMixin(vnffg.VNFFGPluginBase, db_base.CommonDbMixin):
         template_id = vnffg['vnffgd_id']
         symmetrical = vnffg['symmetrical']
 
-        with context.session.begin(subtransactions=True):
-            template_db = self._get_resource(context, VnffgTemplate,
-                                             template_id)
-            LOG.debug(_('vnffg template %s'), template_db)
-            vnf_members = self._get_vnffg_property(template_db,
-                                                   'constituent_vnfs')
-            LOG.debug(_('Constituent VNFs: %s'), vnf_members)
-            vnf_mapping = self._get_vnf_mapping(context, vnffg.get(
-                                                'vnf_mapping'), vnf_members)
-            LOG.debug(_('VNF Mapping: %s'), vnf_mapping)
+        #Deepak
+        template_db = self._get_resource(context, VnffgTemplate,
+                                         template_id)
+        LOG.debug(_('Deepak: vnffg template %s'), template_db)
+	path_list=template_db['template']['vnffgd']['topology_template']['node_templates']['Forwarding_path1']['properties']['path']
+	LOG.debug(_('mayank: path list %s'), path_list)
+	forwarding_path_list = []
+	for capabilities in path_list:
+		forwarding_path_list.insert(len(forwarding_path_list),capabilities['capability'])
+	LOG.debug(_('mayank: forwarding path %s'), forwarding_path_list)
+	topElement = Element('input', xmlns="urn:opendaylight:params:xml:ns:yang:serviceChaining:impl:config")
+	graph_id_tag = SubElement(topElement, 'forwarding_graph')
+	forwarding_graph_id_tag = SubElement(graph_id_tag, 'forwarding_graph_id')
+        forwarding_graph_id_tag.text = 'forwarding_graph1'
+	network_forwarding_path_tag = SubElement(graph_id_tag,'network_forwarding_path')
+	for index in range(len(forwarding_path_list)):
+		if index == 0 :
+                        end_point_source_id = SubElement(network_forwarding_path_tag , 'end_point_source')
+                        end_point_source_id.text = forwarding_path_list[index]
+                        vld_tag = SubElement(network_forwarding_path_tag , 'vld')
+                elif index == len(forwarding_path_list)-1 :
+                        end_point_destination_id = SubElement(network_forwarding_path_tag , 'end_point_destination')
+                        end_point_destination_id.text = forwarding_path_list[index]
+                        vld_tag = SubElement(network_forwarding_path_tag , 'vld')
+	connection_point_tag = 'dst_connection_point'
+	for index in range(1,len(forwarding_path_list)-1):
+		connection_point_element = SubElement(network_forwarding_path_tag , connection_point_tag)
+                vnf_tag = SubElement(connection_point_element , 'vnf')                    
+                vnf_tag.text = 'vnf'
+		vnf_connection_point_tag = SubElement(connection_point_element , 'vnf_connection_point')               
+                vnf_connection_point_tag.text = forwarding_path_list[index]
+                if  connection_point_tag == 'src_connection_point':
+	                vld_tag = SubElement(network_forwarding_path_tag , 'vld')
+                if connection_point_tag == 'dst_connection_point':
+                        connection_point_tag = 'src_connection_point'
+                else : 
+                        connection_point_tag = 'dst_connection_point'
+	LOG.debug(_('top element %s'),topElement)
+	rough_string = ElementTree.tostring(topElement, 'utf-8')
+	LOG.debug(_('mayank: rough string is %s'),rough_string)
+        #reparsed = minidom.parseString(rough_string)
+	LOG.debug(_('mayank: xml is %s'),topElement)
+	for line in open("/etc/neutron/plugins/ml2/ml2_conf.ini","r"):
+        	li=line.strip()
+	        regex = r"(^url *= *http)"
+	        if re.search(regex,line):
+	            odl_ip = line[line.find("//")+2:line.rfind(":")]
+	LOG.debug(_('mayank :odl ip is %s'),odl_ip)
+    	odl_rest_url = 'http://' + odl_ip + ':8181/restconf/operations/serviceChaining-impl-config:handle-nsd'
+        headers = {'Content-Type': 'application/xml'} # set what your server accepts
+        r=requests.post(odl_rest_url, auth =('admin','admin'), data=ElementTree.tostring(topElement, 'utf-8'), headers=headers)
+
+#	LOG.debug(_('mayank: rough string is '),rough_string)
+	
+        #with context.session.begin(subtransactions=True):
+        #    template_db = self._get_resource(context, VnffgTemplate,
+        #                                     template_id)
+        #    LOG.debug(_('Deepak: vnffg template %s'), template_db)
+	#    vnf_members = self._get_vnffg_property(template_db,
+        #                                           'constituent_vnfs')
+        #    LOG.debug(_('Constituent VNFs: %s'), vnf_members)
+        #    vnf_mapping = self._get_vnf_mapping(context, vnffg.get(
+        #                                        'vnf_mapping'), vnf_members)
+        #    LOG.debug(_('VNF Mapping: %s'), vnf_mapping)
             # create NFP dict
-            nfp_dict = self._create_nfp_pre(template_db)
-            vnffg_db = Vnffg(id=vnffg_id,
-                             tenant_id=tenant_id,
-                             name=name,
-                             description=template_db.description,
-                             vnf_mapping=vnf_mapping,
-                             vnffgd_id=template_id,
-                             status=constants.PENDING_CREATE)
-            context.session.add(vnffg_db)
+        #    nfp_dict = self._create_nfp_pre(template_db)
+        #    vnffg_db = Vnffg(id=vnffg_id,
+        #                     tenant_id=tenant_id,
+        #                     name=name,
+        #                     description=template_db.description,
+        #                     vnf_mapping=vnf_mapping,
+        #                     vnffgd_id=template_id,
+        #                     status=constants.PENDING_CREATE)
+        #    context.session.add(vnffg_db)
 
-            nfp_id = str(uuid.uuid4())
-            sfc_id = str(uuid.uuid4())
-            classifier_id = str(uuid.uuid4())
+        #    nfp_id = str(uuid.uuid4())
+        #    sfc_id = str(uuid.uuid4())
+        #    classifier_id = str(uuid.uuid4())
 
-            nfp_db = VnffgNfp(id=nfp_id, vnffg_id=vnffg_id,
-                              tenant_id=tenant_id,
-                              name=nfp_dict['name'],
-                              status=constants.PENDING_CREATE,
-                              path_id=nfp_dict['path_id'],
-                              symmetrical=symmetrical)
-            context.session.add(nfp_db)
+        #    nfp_db = VnffgNfp(id=nfp_id, vnffg_id=vnffg_id,
+        #                      tenant_id=tenant_id,
+        #                      name=nfp_dict['name'],
+        #                      status=constants.PENDING_CREATE,
+        #                      path_id=nfp_dict['path_id'],
+        #                      symmetrical=symmetrical)
+        #    context.session.add(nfp_db)
 
-            chain = self._create_port_chain(context, vnf_mapping, template_db,
-                                            nfp_dict['name'])
-            LOG.debug(_('chain: %s'), chain)
-            sfc_db = VnffgChain(id=sfc_id,
-                                tenant_id=tenant_id,
-                                status=constants.PENDING_CREATE,
-                                symmetrical=symmetrical,
-                                chain=chain,
-                                nfp_id=nfp_id,
-                                path_id=nfp_dict['path_id'])
+        #    chain = self._create_port_chain(context, vnf_mapping, template_db,
+        #                                    nfp_dict['name'])
+        #    LOG.debug(_('chain: %s'), chain)
+        #    sfc_db = VnffgChain(id=sfc_id,
+        #                        tenant_id=tenant_id,
+        #                        status=constants.PENDING_CREATE,
+        #                        symmetrical=symmetrical,
+        #                        chain=chain,
+        #                        nfp_id=nfp_id,
+        #                        path_id=nfp_dict['path_id'])
 
-            context.session.add(sfc_db)
+        #    context.session.add(sfc_db)
 
-            sfcc_db = VnffgClassifier(id=classifier_id,
-                                      tenant_id=tenant_id,
-                                      status=constants.PENDING_CREATE,
-                                      nfp_id=nfp_id,
-                                      chain_id=sfc_id)
-            context.session.add(sfcc_db)
+        #    sfcc_db = VnffgClassifier(id=classifier_id,
+        #                              tenant_id=tenant_id,
+        #                              status=constants.PENDING_CREATE,
+        #                              nfp_id=nfp_id,
+        #                              chain_id=sfc_id)
+        #    context.session.add(sfcc_db)
 
-            match = self._policy_to_acl_criteria(context, template_db,
-                                                 nfp_dict['name'],
-                                                 vnf_mapping)
-            LOG.debug(_('acl_match %s'), match)
+        #    match = self._policy_to_acl_criteria(context, template_db,
+        #                                         nfp_dict['name'],
+        #                                         vnf_mapping)
+        #    LOG.debug(_('acl_match %s'), match)
 
-            match_db_table = ACLMatchCriteria(
-                id=str(uuid.uuid4()),
-                vnffgc_id=classifier_id,
-                **match)
+        #    match_db_table = ACLMatchCriteria(
+        #        id=str(uuid.uuid4()),
+        #        vnffgc_id=classifier_id,
+        #        **match)
 
-            context.session.add(match_db_table)
+        #    context.session.add(match_db_table)
 
-        return self._make_vnffg_dict(vnffg_db)
+        #return self._make_vnffg_dict(vnffg_db)
+        return template_db
 
     @staticmethod
     def _create_nfp_pre(template_db):
