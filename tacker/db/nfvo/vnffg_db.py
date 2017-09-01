@@ -324,7 +324,7 @@ class VnffgPluginDbMixin(vnffg.VNFFGPluginBase, db_base.CommonDbMixin):
 	for index in range(1,len(forwarding_path_list)-1):
 		connection_point_element = SubElement(network_forwarding_path_tag , connection_point_tag)
                 vnf_tag = SubElement(connection_point_element , 'vnf')                    
-                vnf_tag.text = 'vnf'
+                vnf_tag.text = 'vnf'+str(index)
 		vnf_connection_point_tag = SubElement(connection_point_element , 'vnf_connection_point')               
                 vnf_connection_point_tag.text = forwarding_path_list[index]
                 if  connection_point_tag == 'src_connection_point':
